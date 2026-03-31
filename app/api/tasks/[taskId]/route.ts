@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getTaskRecord } from "../../../../lib/mvp-store";
 import type { TaskDetailResponse } from "../../../../lib/mvp-schema";
 
@@ -27,7 +27,8 @@ export async function GET(_request: Request, { params }: Params) {
       title: record.title,
       inputMode: record.inputMode,
       createdAt: record.createdAt,
-      updatedAt: record.updatedAt
+      updatedAt: record.updatedAt,
+      isAutoNamed: record.isAutoNamed
     },
     input: record.input,
     asset: record.asset,

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
   --background: #f6f0e7;
@@ -314,6 +314,15 @@ textarea {
 .field-input:focus {
   border-color: rgba(200, 106, 47, 0.45);
   box-shadow: 0 0 0 4px rgba(200, 106, 47, 0.12);
+}
+
+.field-input::placeholder {
+  color: rgba(111, 103, 95, 0.72);
+  transition: opacity 140ms ease;
+}
+
+.field-input:focus::placeholder {
+  opacity: 0;
 }
 
 .field-textarea {

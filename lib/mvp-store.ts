@@ -1,8 +1,17 @@
-import type { AnalysisResult, AssetRecord, InputMode, TaskInput, TaskStatus } from "./mvp-schema";
+﻿import {
+  buildDraftTaskTitle,
+  getInputModeFromInput,
+  type AnalysisResult,
+  type AssetRecord,
+  type InputMode,
+  type TaskInput,
+  type TaskStatus
+} from "./mvp-schema";
 
 export type StoredTask = {
   taskId: string;
   title: string;
+  isAutoNamed: boolean;
   status: TaskStatus;
   inputMode: InputMode;
   input: TaskInput;
@@ -15,15 +24,16 @@ export type StoredTask = {
 
 const taskStore = new Map<string, StoredTask>();
 
-export function createTaskRecord(input: { title?: string; inputMode: InputMode; input: TaskInput }) {
+export function createTaskRecord(input: { title?: string; inputMode?: InputMode; input: TaskInput; hasImage?: boolean }) {
   const taskId = crypto.randomUUID();
   const timestamp = new Date().toISOString();
-
+  const titleMeta = buildDraftTaskTitle(input.input);
   const record: StoredTask = {
     taskId,
-    title: input.title?.trim() || input.input.themeText,
+    title: titleMeta.title,
+    isAutoNamed: titleMeta.isAutoNamed,
     status: "draft",
-    inputMode: input.inputMode,
+    inputMode: input.inputMode ?? getInputModeFromInput(input.input, Boolean(input.hasImage)),
     input: input.input,
     asset: null,
     result: null,
@@ -49,7 +59,7 @@ export function attachAssetToTask(taskId: string, asset: AssetRecord) {
   const updated: StoredTask = {
     ...record,
     asset,
-    inputMode: record.inputMode === "text" ? "mixed" : record.inputMode,
+    inputMode: getInputModeFromInput(record.input, true),
     updatedAt: new Date().toISOString()
   };
 
@@ -82,6 +92,7 @@ export function saveTaskAnalysis(taskId: string, result: AnalysisResult) {
   const timestamp = new Date().toISOString();
   const updated: StoredTask = {
     ...record,
+    title: result.summary.title,
     status: "completed",
     result,
     generatedAt: timestamp,

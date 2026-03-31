@@ -1,20 +1,16 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createTaskRecord } from "../../../lib/mvp-store";
-import { getInputModeFromInput, normalizeTaskInput, type CreateTaskResponse, type InputMode, type RawTaskInput } from "../../../lib/mvp-schema";
+import { getInputModeFromInput, normalizeTaskInput, type CreateTaskResponse, type RawTaskInput } from "../../../lib/mvp-schema";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as RawTaskInput & { inputMode?: InputMode };
+  const body = (await request.json()) as RawTaskInput & { hasImage?: boolean };
   const input = normalizeTaskInput(body);
-
-  if (!input.themeText) {
-    return NextResponse.json({ error: "Theme text is required." }, { status: 400 });
-  }
-
-  const inputMode = body.inputMode ?? getInputModeFromInput(input, false);
+  const hasImage = Boolean(body.hasImage);
   const record = createTaskRecord({
     title: input.title,
-    inputMode,
-    input
+    inputMode: getInputModeFromInput(input, hasImage),
+    input,
+    hasImage
   });
 
   const response: CreateTaskResponse = {
@@ -23,7 +19,8 @@ export async function POST(request: Request) {
     inputMode: record.inputMode,
     task: {
       title: record.title,
-      createdAt: record.createdAt
+      createdAt: record.createdAt,
+      isAutoNamed: record.isAutoNamed
     }
   };
 

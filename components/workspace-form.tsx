@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { startTransition, useState } from "react";
+import { startTransition, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AnalyzeResponse, CreateTaskResponse, UploadAssetResponse } from "../lib/mvp-schema";
 
@@ -15,7 +15,6 @@ type ApiError = {
 
 type DemoPreset = {
   name: string;
-  title: string;
   themeText: string;
   descriptionText: string;
   styleKeywords: string;
@@ -25,7 +24,6 @@ type DemoPreset = {
 const presets: DemoPreset[] = [
   {
     name: "Singapore Hawker",
-    title: "Singapore Hawker App",
     themeText: "Singapore hawker culture",
     descriptionText: "A polished demo for a community-first food discovery experience with warmth, modular cards, and city texture.",
     styleKeywords: "warm, urban, friendly",
@@ -33,7 +31,6 @@ const presets: DemoPreset[] = [
   },
   {
     name: "Inclusive Care",
-    title: "Community Health Service",
     themeText: "Inclusive community health service",
     descriptionText: "A calm service experience for booking, guidance, and support, with emphasis on trust, accessibility, and reassurance.",
     styleKeywords: "calm, trustworthy, clear",
@@ -41,7 +38,6 @@ const presets: DemoPreset[] = [
   },
   {
     name: "Night Transit",
-    title: "Night Transit Information Screen",
     themeText: "Urban night transit information system",
     descriptionText: "A high-contrast wayfinding surface that helps commuters read timing, route changes, and alerts at a glance.",
     styleKeywords: "high-contrast, urban, compact",
@@ -64,31 +60,68 @@ function readApiError(payload: unknown, fallback: string) {
   return fallback;
 }
 
+function hasAnyMeaningfulInput(values: string[]) {
+  return values.some((value) => value.trim().length > 0);
+}
+
 export function WorkspaceForm() {
   const router = useRouter();
-  const [title, setTitle] = useState(presets[0].title);
-  const [themeText, setThemeText] = useState(presets[0].themeText);
-  const [descriptionText, setDescriptionText] = useState(presets[0].descriptionText);
-  const [styleKeywords, setStyleKeywords] = useState(presets[0].styleKeywords);
-  const [toneKeywords, setToneKeywords] = useState(presets[0].toneKeywords);
+  const [title, setTitle] = useState("");
+  const [themeText, setThemeText] = useState("");
+  const [descriptionText, setDescriptionText] = useState("");
+  const [styleKeywords, setStyleKeywords] = useState("");
+  const [toneKeywords, setToneKeywords] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState(presets[0].name);
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<SubmitState>({
     error: null,
     isSubmitting: false
   });
 
+  const canSubmit = useMemo(
+    () => hasAnyMeaningfulInput([title, themeText, descriptionText, styleKeywords, toneKeywords]) || Boolean(file),
+    [title, themeText, descriptionText, styleKeywords, toneKeywords, file]
+  );
+
   function applyPreset(preset: DemoPreset) {
     setSelectedPreset(preset.name);
-    setTitle(preset.title);
+    setTitle("");
     setThemeText(preset.themeText);
     setDescriptionText(preset.descriptionText);
     setStyleKeywords(preset.styleKeywords);
     setToneKeywords(preset.toneKeywords);
   }
 
+  function clearForm() {
+    setSelectedPreset(null);
+    setTitle("");
+    setThemeText("");
+    setDescriptionText("");
+    setStyleKeywords("");
+    setToneKeywords("");
+    setFile(null);
+    setSubmitState({ error: null, isSubmitting: false });
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    const payload = {
+      title: title.trim(),
+      themeText: themeText.trim(),
+      descriptionText: descriptionText.trim(),
+      styleKeywords: styleKeywords.trim(),
+      toneKeywords: toneKeywords.trim()
+    };
+
+    if (!hasAnyMeaningfulInput(Object.values(payload)) && !file) {
+      setSubmitState({
+        error: "Please add a theme or upload a reference image before running analysis.",
+        isSubmitting: false
+      });
+      return;
+    }
+
     setSubmitState({ error: null, isSubmitting: true });
 
     try {
@@ -98,12 +131,8 @@ export function WorkspaceForm() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          title,
-          inputMode: file ? "mixed" : "text",
-          themeText,
-          descriptionText,
-          styleKeywords,
-          toneKeywords
+          ...payload,
+          hasImage: Boolean(file)
         })
       });
 
@@ -157,13 +186,24 @@ export function WorkspaceForm() {
       <section className="glass-panel rounded-[34px] p-6 md:p-8">
         <div className="grid gap-5 md:grid-cols-2">
           <label className="space-y-2">
-            <span className="field-label">Task title</span>
-            <input className="field-input" onChange={(event) => setTitle(event.target.value)} value={title} />
+            <span className="field-label">Task name (optional)</span>
+            <input
+              className="field-input"
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Leave blank to auto-name from theme or image"
+              value={title}
+            />
+            <p className="text-xs text-[var(--muted)]">If left empty, the system will generate a short task name for you.</p>
           </label>
 
           <label className="space-y-2">
             <span className="field-label">Style keywords</span>
-            <input className="field-input" onChange={(event) => setStyleKeywords(event.target.value)} value={styleKeywords} />
+            <input
+              className="field-input"
+              onChange={(event) => setStyleKeywords(event.target.value)}
+              placeholder="e.g. warm, urban, friendly"
+              value={styleKeywords}
+            />
           </label>
         </div>
 
@@ -172,6 +212,7 @@ export function WorkspaceForm() {
           <textarea
             className="field-input field-textarea"
             onChange={(event) => setThemeText(event.target.value)}
+            placeholder="e.g. Singapore hawker culture"
             value={themeText}
           />
         </label>
@@ -181,6 +222,7 @@ export function WorkspaceForm() {
           <textarea
             className="field-input min-h-28"
             onChange={(event) => setDescriptionText(event.target.value)}
+            placeholder="e.g. A polished community-first food discovery experience with warmth, modular cards, and city texture."
             value={descriptionText}
           />
         </label>
@@ -188,7 +230,12 @@ export function WorkspaceForm() {
         <div className="mt-5 grid gap-5 md:grid-cols-[1fr_260px]">
           <label className="space-y-2">
             <span className="field-label">Tone keywords</span>
-            <input className="field-input" onChange={(event) => setToneKeywords(event.target.value)} value={toneKeywords} />
+            <input
+              className="field-input"
+              onChange={(event) => setToneKeywords(event.target.value)}
+              placeholder="e.g. inclusive, vibrant"
+              value={toneKeywords}
+            />
           </label>
 
           <label className="space-y-2">
@@ -199,18 +246,24 @@ export function WorkspaceForm() {
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               type="file"
             />
-            <p className="text-xs text-[var(--muted)]">{file ? `Attached: ${file.name}` : "Optional, but useful for overlay and readability guidance."}</p>
+            <p className="text-xs text-[var(--muted)]">
+              {file ? `Attached: ${file.name}` : "You can upload only an image and still receive palette and visual direction suggestions."}
+            </p>
           </label>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[26px] border border-[var(--line)] bg-white/65 px-4 py-4">
           <p className="max-w-xl text-sm leading-6 text-[var(--foreground-soft)]">
-            This run keeps the Step 4 contract intact and now returns a presenter-friendly board with key highlights, talk track,
-            and export-ready snippets.
+            This run now supports three paths: text-only, text plus image, or image-only analysis. Placeholder copy stays visual-only and is never sent as task input.
           </p>
-          <button className="cta-primary border-0 disabled:cursor-not-allowed disabled:opacity-60" disabled={submitState.isSubmitting || !themeText.trim()} type="submit">
-            {submitState.isSubmitting ? "Running analysis..." : "Generate design language"}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button className="cta-secondary px-4 py-2 text-sm" onClick={clearForm} type="button">
+              Clear form
+            </button>
+            <button className="cta-primary border-0 disabled:cursor-not-allowed disabled:opacity-60" disabled={submitState.isSubmitting || !canSubmit} type="submit">
+              {submitState.isSubmitting ? "Running analysis..." : "Generate design language"}
+            </button>
+          </div>
         </div>
 
         {submitState.error ? (
@@ -222,7 +275,7 @@ export function WorkspaceForm() {
         <section className="glass-panel rounded-[32px] p-6">
           <div className="flex items-center justify-between gap-3">
             <p className="field-label">Demo presets</p>
-            <span className="text-xs text-[var(--muted)]">Selected: {selectedPreset}</span>
+            <span className="text-xs text-[var(--muted)]">Selected: {selectedPreset ?? "Blank form"}</span>
           </div>
 
           <div className="mt-4 space-y-3">
@@ -244,7 +297,7 @@ export function WorkspaceForm() {
                       <p className="text-base font-semibold text-stone-900">{preset.name}</p>
                       <p className="mt-2 text-sm leading-6 text-[var(--foreground-soft)]">{preset.descriptionText}</p>
                     </div>
-                    <span className="board-chip border-0">Use</span>
+                    <span className="board-chip border-0">Fill</span>
                   </div>
                 </button>
               );

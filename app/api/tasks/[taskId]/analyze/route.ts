@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getTaskRecord, markTaskStatus, saveTaskAnalysis } from "../../../../../lib/mvp-store";
-import { buildAnalysisResult, type AnalyzeResponse } from "../../../../../lib/mvp-schema";
+import { buildAnalysisResult, hasAnyAnalysisInput, type AnalyzeResponse } from "../../../../../lib/mvp-schema";
 
 type Params = {
   params: Promise<{
@@ -10,6 +10,16 @@ type Params = {
 
 export async function POST(_request: Request, { params }: Params) {
   const { taskId } = await params;
+  const currentRecord = getTaskRecord(taskId);
+
+  if (!currentRecord) {
+    return NextResponse.json({ error: "Task not found." }, { status: 404 });
+  }
+
+  if (!hasAnyAnalysisInput(currentRecord.input, Boolean(currentRecord.asset))) {
+    return NextResponse.json({ error: "This task has no text input or image asset to analyze." }, { status: 400 });
+  }
+
   const processingRecord = markTaskStatus(taskId, "processing");
 
   if (!processingRecord) {
@@ -31,7 +41,8 @@ export async function POST(_request: Request, { params }: Params) {
       title: completedRecord.title,
       inputMode: completedRecord.inputMode,
       createdAt: completedRecord.createdAt,
-      updatedAt: completedRecord.updatedAt
+      updatedAt: completedRecord.updatedAt,
+      isAutoNamed: completedRecord.isAutoNamed
     },
     input: completedRecord.input,
     asset: completedRecord.asset,
@@ -61,7 +72,8 @@ export async function GET(_request: Request, { params }: Params) {
       title: record.title,
       inputMode: record.inputMode,
       createdAt: record.createdAt,
-      updatedAt: record.updatedAt
+      updatedAt: record.updatedAt,
+      isAutoNamed: record.isAutoNamed
     },
     input: record.input,
     asset: record.asset,

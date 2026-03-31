@@ -1,4 +1,4 @@
-export type InputMode = "text" | "image" | "mixed";
+﻿export type InputMode = "text" | "image" | "mixed";
 export type TaskStatus = "draft" | "processing" | "completed" | "failed";
 export type ContrastStatus = "pass" | "watch";
 export type ImageReadabilityStatus = "safe" | "watch";
@@ -86,6 +86,7 @@ export type CreateTaskResponse = {
   task: {
     title: string;
     createdAt: string;
+    isAutoNamed: boolean;
   };
 };
 
@@ -103,6 +104,7 @@ export type AnalyzeResponse = {
     inputMode: InputMode;
     createdAt: string;
     updatedAt: string;
+    isAutoNamed: boolean;
   };
   input: TaskInput;
   asset: AssetRecord | null;
@@ -245,8 +247,48 @@ const palettePresets: PalettePreset[] = [
   }
 ];
 
+const presetTitleSuffix: Record<string, string> = {
+  "hawker-warm": "Direction",
+  "care-calm": "System",
+  "transit-night": "Board",
+  "civic-fresh": "Study"
+};
+
 function normalizeText(value: string | undefined) {
   return value?.trim() ?? "";
+}
+
+function toTitleCase(value: string) {
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function cleanPhrase(value: string) {
+  return value
+    .replace(/[^a-zA-Z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildPhraseFromText(value: string) {
+  const cleaned = cleanPhrase(value);
+  if (!cleaned) {
+    return "";
+  }
+
+  return toTitleCase(cleaned.split(" ").slice(0, 4).join(" "));
+}
+
+function titleAlreadyHasSuffix(title: string) {
+  return /(direction|study|system|board|app|service|screen)$/i.test(title.trim());
+}
+
+function findPresetById(id: string) {
+  return palettePresets.find((preset) => preset.id === id) ?? palettePresets[0];
 }
 
 export function normalizeKeywords(value: string | string[] | undefined) {
@@ -270,8 +312,18 @@ export function normalizeTaskInput(raw: RawTaskInput): TaskInput {
   };
 }
 
+export function hasMeaningfulTextInput(input: TaskInput) {
+  return Boolean(input.themeText || input.descriptionText || input.styleKeywords.length || input.toneKeywords.length);
+}
+
+export function hasAnyAnalysisInput(input: TaskInput, hasImage: boolean) {
+  return hasMeaningfulTextInput(input) || hasImage;
+}
+
 export function getInputModeFromInput(input: TaskInput, hasImage: boolean): InputMode {
-  if (hasImage && input.themeText) {
+  const hasText = hasMeaningfulTextInput(input);
+
+  if (hasImage && hasText) {
     return "mixed";
   }
 
@@ -317,8 +369,38 @@ export function buildAssetRecord(file: File): AssetRecord {
   };
 }
 
-function choosePreset(input: TaskInput) {
+function choosePresetFromImage(asset: AssetRecord | null) {
+  if (!asset) {
+    return palettePresets[0];
+  }
+
+  if (asset.imageDensity === "high") {
+    return findPresetById("transit-night");
+  }
+
+  const dominant = asset.palette[0] ?? "";
+
+  if (["#C85F2B", "#F4C95D", "#D97706", "#B91C1C"].includes(dominant)) {
+    return findPresetById("hawker-warm");
+  }
+
+  if (["#0F766E", "#2F7A6A"].includes(dominant)) {
+    return findPresetById("civic-fresh");
+  }
+
+  if (["#2E4057", "#1D4ED8", "#7C3AED"].includes(dominant)) {
+    return findPresetById("transit-night");
+  }
+
+  return findPresetById("care-calm");
+}
+
+function choosePreset(input: TaskInput, asset: AssetRecord | null) {
   const source = [input.themeText, input.descriptionText, ...input.styleKeywords, ...input.toneKeywords].join(" ").toLowerCase();
+
+  if (!source.trim()) {
+    return choosePresetFromImage(asset);
+  }
 
   let selected = palettePresets[0];
   let bestScore = -1;
@@ -379,12 +461,122 @@ function buildTailwindSnippet(tokens: ColorToken[]) {
   return ["theme: {", "  extend: {", "    colors: {", ...lines, "    }", "  }", "}"].join("\n");
 }
 
+export function buildDraftTaskTitle(input: TaskInput) {
+  const explicitTitle = input.title?.trim();
+
+  if (explicitTitle) {
+    return {
+      title: explicitTitle,
+      isAutoNamed: false
+    };
+  }
+
+  const phrase = buildPhraseFromText(input.themeText || input.descriptionText);
+
+  if (!phrase) {
+    return {
+      title: "Untitled Visual Study",
+      isAutoNamed: true
+    };
+  }
+
+  return {
+    title: titleAlreadyHasSuffix(phrase) ? phrase : `${phrase} Direction`,
+    isAutoNamed: true
+  };
+}
+
+export function buildFinalTaskTitle(input: TaskInput, asset: AssetRecord | null, presetId: string) {
+  const explicitTitle = input.title?.trim();
+
+  if (explicitTitle) {
+    return {
+      title: explicitTitle,
+      isAutoNamed: false
+    };
+  }
+
+  const phrase = buildPhraseFromText(input.themeText || input.descriptionText);
+
+  if (phrase) {
+    const suffix = presetTitleSuffix[presetId] ?? "Direction";
+    return {
+      title: titleAlreadyHasSuffix(phrase) ? phrase : `${phrase} ${suffix}`,
+      isAutoNamed: true
+    };
+  }
+
+  if (asset) {
+    return {
+      title: "Image-led Color Study",
+      isAutoNamed: true
+    };
+  }
+
+  return {
+    title: "Untitled Visual Study",
+    isAutoNamed: true
+  };
+}
+
+function buildColorSystem(preset: PalettePreset, asset: AssetRecord | null, imageOnlyMode: boolean): ColorToken[] {
+  const primary = imageOnlyMode ? asset?.palette[0] ?? preset.colors.primary : preset.colors.primary;
+  const secondary = imageOnlyMode ? asset?.palette[1] ?? preset.colors.secondary : preset.colors.secondary;
+  const accent = imageOnlyMode ? asset?.palette[2] ?? preset.colors.accent : preset.colors.accent;
+  const surface = imageOnlyMode ? "#FFF9F2" : preset.colors.surface;
+  const text = imageOnlyMode ? "#171412" : preset.colors.text;
+
+  return [
+    {
+      label: "Primary",
+      tokenName: "--color-primary",
+      hex: primary,
+      role: "primary",
+      usage: imageOnlyMode
+        ? "Use the dominant extracted image tone for hero actions, emphasis, and main visual identity."
+        : "Use for primary actions, key moments, and the strongest brand accent."
+    },
+    {
+      label: "Secondary",
+      tokenName: "--color-secondary",
+      hex: secondary,
+      role: "secondary",
+      usage: imageOnlyMode
+        ? "Use the balancing extracted tone for panels, navigation moments, or supporting contrast."
+        : "Use for supporting hierarchy, navigation moments, and balancing the primary hue."
+    },
+    {
+      label: "Accent",
+      tokenName: "--color-accent",
+      hex: accent,
+      role: "accent",
+      usage: imageOnlyMode
+        ? "Use sparingly for highlight chips, active states, or small moments of visual energy."
+        : "Use sparingly for chips, highlights, or status emphasis rather than large surfaces."
+    },
+    {
+      label: "Surface",
+      tokenName: "--color-surface",
+      hex: surface,
+      role: "surface",
+      usage: "Use for cards, content panels, and large background planes."
+    },
+    {
+      label: "Text",
+      tokenName: "--color-text-primary",
+      hex: text,
+      role: "text",
+      usage: "Use for body text, labels, and high-legibility content blocks."
+    }
+  ];
+}
+
 export function buildAnalysisResult(input: TaskInput, asset: AssetRecord | null): AnalysisResult {
-  const preset = choosePreset(input);
-  const title = input.title || input.themeText || "Design language assistant";
-  const keywordPool = [...input.styleKeywords, ...input.toneKeywords, ...fallbackKeywords];
-  const uniqueKeywords = Array.from(new Set(keywordPool)).slice(0, 5);
-  const contrastRatio = getContrastRatio(preset.colors.text, preset.colors.surface);
+  const imageOnlyMode = !hasMeaningfulTextInput(input) && Boolean(asset);
+  const preset = choosePreset(input, asset);
+  const titleMeta = buildFinalTaskTitle(input, asset, preset.id);
+  const colorSystem = buildColorSystem(preset, asset, imageOnlyMode);
+  const contrastRatio = getContrastRatio(colorSystem[4].hex, colorSystem[3].hex);
   const contrastStatus: ContrastStatus = contrastRatio >= 4.5 ? "pass" : "watch";
   const readabilityStatus: ImageReadabilityStatus = asset?.imageDensity === "high" ? "watch" : "safe";
   const recommendedTextColor = contrastRatio >= 7 ? "#FFFFFF" : "#F8FAFC";
@@ -396,56 +588,35 @@ export function buildAnalysisResult(input: TaskInput, asset: AssetRecord | null)
         : "24% to 32%"
     : "24% to 32%";
 
-  const colorSystem: ColorToken[] = [
-    {
-      label: "Primary",
-      tokenName: "--color-primary",
-      hex: preset.colors.primary,
-      role: "primary",
-      usage: "Use for primary actions, key moments, and the strongest brand accent."
-    },
-    {
-      label: "Secondary",
-      tokenName: "--color-secondary",
-      hex: preset.colors.secondary,
-      role: "secondary",
-      usage: "Use for supporting hierarchy, navigation moments, and balancing the primary hue."
-    },
-    {
-      label: "Accent",
-      tokenName: "--color-accent",
-      hex: preset.colors.accent,
-      role: "accent",
-      usage: "Use sparingly for chips, highlights, or status emphasis rather than large surfaces."
-    },
-    {
-      label: "Surface",
-      tokenName: "--color-surface",
-      hex: preset.colors.surface,
-      role: "surface",
-      usage: "Use for cards, content panels, and large background planes."
-    },
-    {
-      label: "Text",
-      tokenName: "--color-text-primary",
-      hex: preset.colors.text,
-      role: "text",
-      usage: "Use for body text, labels, and high-legibility content blocks."
-    }
-  ];
+  const keywordPool = imageOnlyMode
+    ? ["image-led", "palette-first", asset?.imageDensity === "high" ? "high-detail" : "overlay-ready", preset.styleTags[0]]
+    : [...input.styleKeywords, ...input.toneKeywords, ...fallbackKeywords];
+  const uniqueKeywords = Array.from(new Set(keywordPool)).slice(0, 5);
+
+  const themeSummary = imageOnlyMode
+    ? "This image-led study turns one reference asset into a reusable UI direction, focusing on extracted palette, overlay safety, and a believable component mood."
+    : `${input.themeText || input.descriptionText} is translated into a ${preset.id.replace(/-/g, " ")} direction with enough structure to build a believable MVP demo.`;
+
+  const visualStrategy = imageOnlyMode
+    ? `Start from the extracted palette, keep ${preset.styleTags[0].toLowerCase()} as the guiding mood, and use ${overlayOpacity} overlays to preserve readability without flattening the image.`
+    : preset.visualStrategy;
+
+  const moodPrompt = imageOnlyMode
+    ? `An image-first direction shaped by one reference asset, ${asset?.imageDensity ?? "medium"} visual density, and a ${preset.id.replace(/-/g, " ")} tone.`
+    : preset.moodPrompt;
 
   return {
     summary: {
-      title,
-      themeSummary: `${input.themeText} is translated into a ${preset.id.replace(/-/g, " ")} direction with enough structure to build a believable MVP demo.`,
-      visualStrategy: preset.visualStrategy,
+      title: titleMeta.title,
+      themeSummary,
+      visualStrategy,
       keywords: uniqueKeywords
     },
     moodboard: {
-      styleTags: preset.styleTags,
+      styleTags: imageOnlyMode ? [...preset.styleTags.slice(0, 3), "palette-led direction"] : preset.styleTags,
       iconDirection: preset.iconDirection,
       textureDirection: preset.textureDirection,
-      moodPrompt: preset.moodPrompt
+      moodPrompt
     },
     colorSystem,
     imageAdaptation: {
@@ -453,10 +624,12 @@ export function buildAnalysisResult(input: TaskInput, asset: AssetRecord | null)
       assetSummary: asset
         ? `${asset.fileName} (${asset.mimeType || "image"}, ${Math.max(1, Math.round(asset.fileSize / 1024))} KB) is attached as the current reference asset.`
         : "No image uploaded yet. These recommendations are generated from the theme and tone inputs only.",
-      palette: asset?.palette ?? [preset.colors.primary, preset.colors.secondary, preset.colors.accent],
+      palette: asset?.palette ?? [colorSystem[0].hex, colorSystem[1].hex, colorSystem[2].hex],
       overlayRecommendation: asset ? preset.overlayRecommendation : "Start with a 24% to 32% neutral overlay and increase only if the image becomes busy.",
       overlayOpacity,
-      textOnImageRecommendation: preset.textOnImageRecommendation,
+      textOnImageRecommendation: imageOnlyMode
+        ? "Use short headings first, then test supporting text only in the suggested safe region."
+        : preset.textOnImageRecommendation,
       recommendedTextColor,
       borderRecommendation: preset.borderRecommendation,
       placementRecommendation: asset ? `${preset.placementRecommendation} ${asset.aspectHint}` : preset.placementRecommendation,
@@ -473,8 +646,8 @@ export function buildAnalysisResult(input: TaskInput, asset: AssetRecord | null)
       readabilityStatus,
       readabilityAlert: asset
         ? readabilityStatus === "watch"
-          ? `This image likely has higher visual density, so keep text shorter and increase overlay strength before adding more decoration.`
-          : `This image looks safe enough for headings if you respect the suggested text region and overlay range.`
+          ? "This image likely has higher visual density, so keep text shorter and increase overlay strength before adding more decoration."
+          : "This image looks safe enough for headings if you respect the suggested text region and overlay range."
         : "When you add an image later, protect headline readability before adjusting the text color itself.",
       stateGuidance: preset.stateGuidance
     },
