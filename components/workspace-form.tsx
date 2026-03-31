@@ -2,11 +2,24 @@
 
 import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { AnalyzeResponse, CreateTaskResponse, UploadAssetResponse } from "../lib/mvp-schema";
 
 type SubmitState = {
   error: string | null;
   isSubmitting: boolean;
 };
+
+type ApiError = {
+  error: string;
+};
+
+function readApiError(payload: unknown, fallback: string) {
+  if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") {
+    return payload.error;
+  }
+
+  return fallback;
+}
 
 export function WorkspaceForm() {
   const router = useRouter();
@@ -41,12 +54,10 @@ export function WorkspaceForm() {
         })
       });
 
-      if (!taskResponse.ok) {
-        throw new Error("Unable to create the task skeleton.");
+      const taskPayload = (await taskResponse.json()) as CreateTaskResponse | ApiError;
+      if (!taskResponse.ok || !("taskId" in taskPayload)) {
+        throw new Error(readApiError(taskPayload, "Unable to create the analysis task."));
       }
-
-      const taskPayload = (await taskResponse.json()) as { taskId: string };
-      let imageName = "";
 
       if (file) {
         const formData = new FormData();
@@ -57,34 +68,21 @@ export function WorkspaceForm() {
           body: formData
         });
 
-        if (!assetResponse.ok) {
-          throw new Error("The image placeholder upload failed.");
+        const assetPayload = (await assetResponse.json()) as UploadAssetResponse | ApiError;
+        if (!assetResponse.ok || !("asset" in assetPayload)) {
+          throw new Error(readApiError(assetPayload, "Unable to upload the selected image."));
         }
-
-        const assetPayload = (await assetResponse.json()) as { asset: { fileName: string } };
-        imageName = assetPayload.asset.fileName;
       }
 
       const analyzeResponse = await fetch(`/api/tasks/${taskPayload.taskId}/analyze`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          title,
-          themeText,
-          descriptionText,
-          styleKeywords,
-          toneKeywords,
-          imageName
-        })
+        method: "POST"
       });
 
-      if (!analyzeResponse.ok) {
-        throw new Error("The analyze endpoint placeholder failed.");
+      const analyzePayload = (await analyzeResponse.json()) as AnalyzeResponse | ApiError;
+      if (!analyzeResponse.ok || !("result" in analyzePayload)) {
+        throw new Error(readApiError(analyzePayload, "The analyze request failed."));
       }
 
-      const analyzePayload = await analyzeResponse.json();
       sessionStorage.setItem(`mvp-task:${taskPayload.taskId}`, JSON.stringify(analyzePayload.result));
 
       startTransition(() => {
@@ -159,19 +157,20 @@ export function WorkspaceForm() {
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             type="file"
           />
+          <p className="text-xs text-stone-500">{file ? `Attached: ${file.name}` : "Optional, but useful for image adaptation guidance."}</p>
         </label>
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
         <p className="text-sm text-stone-600">
-          Step 2 skeleton: create task, upload one image, call placeholder analyze route, and open the result page.
+          Step 3 contract: create a task, attach an optional image, run structured analysis, and open a fixed result schema.
         </p>
         <button
           className="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={submitState.isSubmitting}
+          disabled={submitState.isSubmitting || !themeText.trim()}
           type="submit"
         >
-          {submitState.isSubmitting ? "Building skeleton..." : "Generate design language"}
+          {submitState.isSubmitting ? "Generating direction..." : "Generate design language"}
         </button>
       </div>
 
@@ -181,4 +180,3 @@ export function WorkspaceForm() {
     </form>
   );
 }
-

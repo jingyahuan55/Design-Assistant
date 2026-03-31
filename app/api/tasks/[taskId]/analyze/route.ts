@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { buildMockResult, type TaskInput } from "../../../../../lib/mvp-schema";
+import { getTaskRecord, markTaskStatus } from "../../../../../lib/mvp-store";
+import { buildAnalysisResult, type AnalyzeResponse } from "../../../../../lib/mvp-schema";
 
 type Params = {
   params: Promise<{
@@ -7,14 +8,35 @@ type Params = {
   }>;
 };
 
-export async function POST(request: Request, { params }: Params) {
+export async function POST(_request: Request, { params }: Params) {
   const { taskId } = await params;
-  const body = (await request.json()) as TaskInput;
+  const processingRecord = markTaskStatus(taskId, "processing");
 
-  return NextResponse.json({
+  if (!processingRecord) {
+    return NextResponse.json({ error: "Task not found." }, { status: 404 });
+  }
+
+  const result = buildAnalysisResult(processingRecord.input, processingRecord.asset);
+  const completedRecord = markTaskStatus(taskId, "completed");
+
+  if (!completedRecord) {
+    return NextResponse.json({ error: "Unable to complete analysis." }, { status: 500 });
+  }
+
+  const response: AnalyzeResponse = {
     taskId,
-    status: "completed",
-    result: buildMockResult(body)
-  });
-}
+    status: completedRecord.status,
+    task: {
+      title: completedRecord.title,
+      inputMode: completedRecord.inputMode,
+      createdAt: completedRecord.createdAt,
+      updatedAt: completedRecord.updatedAt
+    },
+    input: completedRecord.input,
+    asset: completedRecord.asset,
+    result,
+    generatedAt: new Date().toISOString()
+  };
 
+  return NextResponse.json(response);
+}

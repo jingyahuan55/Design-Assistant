@@ -20,8 +20,13 @@ export function ResultView() {
 
     const stored = sessionStorage.getItem(`mvp-task:${taskId}`);
     if (stored) {
-      setResult(JSON.parse(stored) as AnalysisResult);
+      try {
+        setResult(JSON.parse(stored) as AnalysisResult);
+      } catch {
+        setResult(fallbackResult);
+      }
     }
+
     setStatus("ready");
   }, [taskId]);
 
@@ -34,7 +39,7 @@ export function ResultView() {
   if (status === "loading") {
     return (
       <div className="glass-panel rounded-[32px] p-8">
-        <p className="text-sm text-stone-600">Loading the skeleton result...</p>
+        <p className="text-sm text-stone-600">Loading the structured analysis...</p>
       </div>
     );
   }
@@ -75,9 +80,18 @@ export function ResultView() {
         </SectionCard>
 
         <SectionCard eyebrow="Accessibility" title="Minimum quality guardrails">
-          <p>{result.accessibility.contrastAlert}</p>
-          <p>{result.accessibility.readabilityAlert}</p>
-          <p>{result.accessibility.stateGuidance}</p>
+          <p>
+            <strong>Contrast:</strong> {result.accessibility.contrastAlert}
+          </p>
+          <p>
+            <strong>Readable imagery:</strong> {result.accessibility.readabilityAlert}
+          </p>
+          <p>
+            <strong>State guidance:</strong> {result.accessibility.stateGuidance}
+          </p>
+          <p>
+            <strong>Measured ratio:</strong> {result.accessibility.contrastRatio}:1
+          </p>
         </SectionCard>
       </div>
 
@@ -104,9 +118,22 @@ export function ResultView() {
         </SectionCard>
 
         <SectionCard eyebrow="Image Adaptation" title="How the image should behave">
+          <p>{result.imageAdaptation.assetSummary}</p>
+          <div className="flex flex-wrap gap-2">
+            {result.imageAdaptation.palette.map((swatch) => (
+              <span
+                aria-label={swatch}
+                className="h-10 w-10 rounded-2xl border border-black/10"
+                key={swatch}
+                style={{ backgroundColor: swatch }}
+                title={swatch}
+              />
+            ))}
+          </div>
           <p>{result.imageAdaptation.overlayRecommendation}</p>
           <p>{result.imageAdaptation.textOnImageRecommendation}</p>
           <p>{result.imageAdaptation.borderRecommendation}</p>
+          <p>{result.imageAdaptation.placementRecommendation}</p>
           <p>
             <strong>Safe text region:</strong> {result.imageAdaptation.safeTextRegion}
           </p>
@@ -146,4 +173,3 @@ export function ResultView() {
     </div>
   );
 }
-

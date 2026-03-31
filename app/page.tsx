@@ -15,8 +15,8 @@ export default function HomePage() {
           Turn a theme and one image into a usable design language.
         </h1>
         <p className="mt-5 max-w-3xl text-lg leading-8 text-stone-700">
-          This one-day MVP skeleton is focused on the shortest path: landing page, workspace, result page, and
-          placeholder APIs that return a structured design direction.
+          This MVP now runs a real structured flow: create a task, attach one image, analyze the theme, and return a
+          stable design-direction schema for the result page.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
@@ -42,4 +42,3 @@ export default function HomePage() {
     </main>
   );
 }
-
