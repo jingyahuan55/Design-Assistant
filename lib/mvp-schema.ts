@@ -1,5 +1,7 @@
 export type InputMode = "text" | "image" | "mixed";
 export type TaskStatus = "draft" | "processing" | "completed" | "failed";
+export type ContrastStatus = "pass" | "watch";
+export type ImageReadabilityStatus = "safe" | "watch";
 
 export type RawTaskInput = {
   title?: string;
@@ -25,6 +27,7 @@ export type AssetRecord = {
   palette: string[];
   subjectHint: string;
   aspectHint: string;
+  imageDensity: "low" | "medium" | "high";
 };
 
 export type ColorToken = {
@@ -54,7 +57,9 @@ export type AnalysisResult = {
     assetSummary: string;
     palette: string[];
     overlayRecommendation: string;
+    overlayOpacity: string;
     textOnImageRecommendation: string;
+    recommendedTextColor: string;
     borderRecommendation: string;
     placementRecommendation: string;
     safeTextRegion: string;
@@ -62,7 +67,9 @@ export type AnalysisResult = {
   };
   accessibility: {
     contrastRatio: number;
+    contrastStatus: ContrastStatus;
     contrastAlert: string;
+    readabilityStatus: ImageReadabilityStatus;
     readabilityAlert: string;
     stateGuidance: string;
   };
@@ -102,6 +109,8 @@ export type AnalyzeResponse = {
   result: AnalysisResult;
   generatedAt: string;
 };
+
+export type TaskDetailResponse = AnalyzeResponse;
 
 type PalettePreset = {
   id: string;
@@ -288,7 +297,13 @@ export function buildAssetRecord(file: File): AssetRecord {
   const seed = hashString(`${file.name}:${file.type}:${file.size}`);
   const start = seed % filePaletteBank.length;
   const palette = [0, 3, 6].map((offset) => filePaletteBank[(start + offset) % filePaletteBank.length]);
-  const aspectHint = file.size > 1_200_000 ? "Likely a richer hero image that can support a banner layout." : "Likely better for cards, sections, or supporting visual modules.";
+  const imageDensity = file.size > 1_600_000 ? "high" : file.size > 700_000 ? "medium" : "low";
+  const aspectHint =
+    imageDensity === "high"
+      ? "Likely a richer hero image that can support a banner layout."
+      : imageDensity === "medium"
+        ? "Likely best for feature cards or split hero modules."
+        : "Likely better for cards, sections, or supporting visual modules.";
 
   return {
     assetId: crypto.randomUUID(),
@@ -297,7 +312,8 @@ export function buildAssetRecord(file: File): AssetRecord {
     fileSize: file.size,
     palette,
     subjectHint: "Assume one dominant visual subject and keep key labels out of the central focus zone.",
-    aspectHint
+    aspectHint,
+    imageDensity
   };
 }
 
@@ -369,6 +385,16 @@ export function buildAnalysisResult(input: TaskInput, asset: AssetRecord | null)
   const keywordPool = [...input.styleKeywords, ...input.toneKeywords, ...fallbackKeywords];
   const uniqueKeywords = Array.from(new Set(keywordPool)).slice(0, 5);
   const contrastRatio = getContrastRatio(preset.colors.text, preset.colors.surface);
+  const contrastStatus: ContrastStatus = contrastRatio >= 4.5 ? "pass" : "watch";
+  const readabilityStatus: ImageReadabilityStatus = asset?.imageDensity === "high" ? "watch" : "safe";
+  const recommendedTextColor = contrastRatio >= 7 ? "#FFFFFF" : "#F8FAFC";
+  const overlayOpacity = asset
+    ? asset.imageDensity === "high"
+      ? "40% to 52%"
+      : asset.imageDensity === "medium"
+        ? "32% to 40%"
+        : "24% to 32%"
+    : "24% to 32%";
 
   const colorSystem: ColorToken[] = [
     {
@@ -429,20 +455,26 @@ export function buildAnalysisResult(input: TaskInput, asset: AssetRecord | null)
         : "No image uploaded yet. These recommendations are generated from the theme and tone inputs only.",
       palette: asset?.palette ?? [preset.colors.primary, preset.colors.secondary, preset.colors.accent],
       overlayRecommendation: asset ? preset.overlayRecommendation : "Start with a 24% to 32% neutral overlay and increase only if the image becomes busy.",
+      overlayOpacity,
       textOnImageRecommendation: preset.textOnImageRecommendation,
+      recommendedTextColor,
       borderRecommendation: preset.borderRecommendation,
-      placementRecommendation: preset.placementRecommendation,
+      placementRecommendation: asset ? `${preset.placementRecommendation} ${asset.aspectHint}` : preset.placementRecommendation,
       safeTextRegion: preset.safeTextRegion,
       cautionZone: asset ? `${preset.cautionZone} ${asset.subjectHint}` : preset.cautionZone
     },
     accessibility: {
       contrastRatio,
+      contrastStatus,
       contrastAlert:
-        contrastRatio >= 4.5
+        contrastStatus === "pass"
           ? `Surface and primary text currently meet a strong contrast baseline at ${contrastRatio}:1.`
           : `Surface and primary text only reach ${contrastRatio}:1, so darken text or lighten the surface before shipping.`,
+      readabilityStatus,
       readabilityAlert: asset
-        ? `Use the uploaded image with restraint: ${preset.safeTextRegion.toLowerCase()} ${preset.cautionZone}`
+        ? readabilityStatus === "watch"
+          ? `This image likely has higher visual density, so keep text shorter and increase overlay strength before adding more decoration.`
+          : `This image looks safe enough for headings if you respect the suggested text region and overlay range.`
         : "When you add an image later, protect headline readability before adjusting the text color itself.",
       stateGuidance: preset.stateGuidance
     },

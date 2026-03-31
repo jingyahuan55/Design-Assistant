@@ -163,14 +163,14 @@ export function WorkspaceForm() {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
         <p className="text-sm text-stone-600">
-          Step 3 contract: create a task, attach an optional image, run structured analysis, and open a fixed result schema.
+          Step 4 quality pass: keep the same schema, add stronger rule signals, and make the result page resilient on refresh.
         </p>
         <button
           className="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={submitState.isSubmitting || !themeText.trim()}
           type="submit"
         >
-          {submitState.isSubmitting ? "Generating direction..." : "Generate design language"}
+          {submitState.isSubmitting ? "Running rule checks..." : "Generate design language"}
         </button>
       </div>
 

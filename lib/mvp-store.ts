@@ -1,4 +1,4 @@
-import type { AssetRecord, InputMode, TaskInput, TaskStatus } from "./mvp-schema";
+import type { AnalysisResult, AssetRecord, InputMode, TaskInput, TaskStatus } from "./mvp-schema";
 
 export type StoredTask = {
   taskId: string;
@@ -7,6 +7,8 @@ export type StoredTask = {
   inputMode: InputMode;
   input: TaskInput;
   asset: AssetRecord | null;
+  result: AnalysisResult | null;
+  generatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -24,6 +26,8 @@ export function createTaskRecord(input: { title?: string; inputMode: InputMode; 
     inputMode: input.inputMode,
     input: input.input,
     asset: null,
+    result: null,
+    generatedAt: null,
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -63,6 +67,25 @@ export function markTaskStatus(taskId: string, status: TaskStatus) {
     ...record,
     status,
     updatedAt: new Date().toISOString()
+  };
+
+  taskStore.set(taskId, updated);
+  return updated;
+}
+
+export function saveTaskAnalysis(taskId: string, result: AnalysisResult) {
+  const record = taskStore.get(taskId);
+  if (!record) {
+    return null;
+  }
+
+  const timestamp = new Date().toISOString();
+  const updated: StoredTask = {
+    ...record,
+    status: "completed",
+    result,
+    generatedAt: timestamp,
+    updatedAt: timestamp
   };
 
   taskStore.set(taskId, updated);
