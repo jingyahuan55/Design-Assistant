@@ -50,6 +50,11 @@ const presets: DemoPreset[] = [
 ];
 
 const outputs = ["Direction board", "Color tokens", "Image overlay guidance", "Accessibility signals"];
+const demoFlow = [
+  "Pick one stable preset so the story starts strong before you improvise.",
+  "Attach an image only when you want to demonstrate overlay, text color, and readability rules.",
+  "Present the result top-down: summary, design moves, accessibility checks, then code exports."
+];
 
 function readApiError(payload: unknown, fallback: string) {
   if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") {
@@ -200,8 +205,8 @@ export function WorkspaceForm() {
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[26px] border border-[var(--line)] bg-white/65 px-4 py-4">
           <p className="max-w-xl text-sm leading-6 text-[var(--foreground-soft)]">
-            This run keeps the Step 4 contract intact and adds stronger rule feedback so the result board feels closer to a
-            real design review surface.
+            This run keeps the Step 4 contract intact and now returns a presenter-friendly board with key highlights, talk track,
+            and export-ready snippets.
           </p>
           <button className="cta-primary border-0 disabled:cursor-not-allowed disabled:opacity-60" disabled={submitState.isSubmitting || !themeText.trim()} type="submit">
             {submitState.isSubmitting ? "Running analysis..." : "Generate design language"}
@@ -253,6 +258,18 @@ export function WorkspaceForm() {
             {outputs.map((item) => (
               <div className="metric-pill" key={item}>
                 <span className="metric-value text-base">{item}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="glass-panel rounded-[32px] p-6">
+          <p className="field-label">Best demo flow</p>
+          <div className="mt-4 space-y-3">
+            {demoFlow.map((item, index) => (
+              <div className="rounded-[22px] border border-[var(--line)] bg-white/72 px-4 py-4" key={item}>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">Step 0{index + 1}</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--foreground-soft)]">{item}</p>
               </div>
             ))}
           </div>

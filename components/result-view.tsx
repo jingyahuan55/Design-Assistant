@@ -1,14 +1,36 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { fallbackResult, type AnalysisResult, type TaskDetailResponse } from "../lib/mvp-schema";
 import { SectionCard } from "./section-card";
 
 type ViewStatus = "loading" | "ready" | "error";
+type ResultSource = "live" | "preview" | "fallback";
 
 function statusChipClass(status: "pass" | "watch" | "safe") {
   return status === "pass" || status === "safe" ? "status-chip status-chip-pass" : "status-chip status-chip-watch";
+}
+
+function buildTalkTrack(result: AnalysisResult) {
+  return [
+    {
+      step: "01",
+      title: "Frame the concept",
+      body: result.summary.themeSummary
+    },
+    {
+      step: "02",
+      title: "Point to the UI moves",
+      body: `Lead with ${result.colorSystem[0]?.label.toLowerCase() ?? "the primary token"}, support it with ${result.colorSystem[1]?.label.toLowerCase() ?? "a secondary token"}, and apply the image guidance to ${result.imageAdaptation.placementRecommendation.toLowerCase()}`
+    },
+    {
+      step: "03",
+      title: "Close with handoff confidence",
+      body: `${result.accessibility.contrastAlert} The export block is already formatted for quick code or token handoff.`
+    }
+  ];
 }
 
 export function ResultView() {
@@ -16,6 +38,7 @@ export function ResultView() {
   const taskId = searchParams.get("taskId");
   const [result, setResult] = useState<AnalysisResult>(fallbackResult);
   const [status, setStatus] = useState<ViewStatus>("loading");
+  const [source, setSource] = useState<ResultSource>("preview");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState<"css" | "tailwind" | null>(null);
 
@@ -26,6 +49,7 @@ export function ResultView() {
       if (!taskId) {
         if (!cancelled) {
           setResult(fallbackResult);
+          setSource("preview");
           setErrorMessage(null);
           setStatus("ready");
         }
@@ -38,6 +62,7 @@ export function ResultView() {
           const parsed = JSON.parse(stored) as AnalysisResult;
           if (!cancelled) {
             setResult(parsed);
+            setSource("live");
             setErrorMessage(null);
             setStatus("ready");
           }
@@ -65,12 +90,14 @@ export function ResultView() {
 
         if (!cancelled) {
           setResult(payload.result);
+          setSource("live");
           setErrorMessage(null);
           setStatus("ready");
         }
       } catch (error) {
         if (!cancelled) {
           setResult(fallbackResult);
+          setSource("fallback");
           setErrorMessage(error instanceof Error ? error.message : "Unable to load this analysis result.");
           setStatus("error");
         }
@@ -91,6 +118,25 @@ export function ResultView() {
     window.setTimeout(() => setCopied(null), 1400);
   }
 
+  const talkTrack = buildTalkTrack(result);
+  const heroInsight = [
+    {
+      eyebrow: "Opening line",
+      title: "Why this direction works",
+      body: result.summary.visualStrategy
+    },
+    {
+      eyebrow: "Best application",
+      title: "Where to show it in the demo",
+      body: result.imageAdaptation.placementRecommendation
+    },
+    {
+      eyebrow: "Guardrail",
+      title: "What to check before handoff",
+      body: result.accessibility.readabilityAlert
+    }
+  ];
+
   if (status === "loading") {
     return (
       <div className="glass-panel rounded-[34px] p-8">
@@ -101,10 +147,28 @@ export function ResultView() {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      {errorMessage ? (
-        <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-          {errorMessage} Showing the fallback preview result instead.
-        </div>
+      {source !== "live" ? (
+        <section className="panel-soft rounded-[30px] px-5 py-5 md:px-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="field-label">{source === "preview" ? "Preview Mode" : "Fallback Preview"}</p>
+              <p className="mt-2 text-sm leading-7 text-[var(--foreground-soft)]">
+                {source === "preview"
+                  ? "You opened the result board without a live task, so this screen is showing the stable demo preset. Start a new run to generate your own structured output."
+                  : `${errorMessage} You are seeing the stable fallback board so the demo can keep moving.`}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link className="cta-primary border-0" href="/workspace">
+                Start a new run
+              </Link>
+              <Link className="cta-secondary px-4 py-2 text-sm" href="/">
+                Back to landing
+              </Link>
+            </div>
+          </div>
+        </section>
       ) : null}
 
       <section className="glass-panel overflow-hidden rounded-[40px] px-6 py-7 md:px-8 md:py-8">
@@ -126,6 +190,14 @@ export function ResultView() {
                 </span>
               ))}
             </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link className="cta-primary border-0" href="/workspace">
+                Generate another run
+              </Link>
+              <a className="cta-secondary px-4 py-2 text-sm" href="#demo-talk-track">
+                Jump to talk track
+              </a>
+            </div>
           </div>
 
           <div className="board-grid">
@@ -139,6 +211,7 @@ export function ResultView() {
                   Image {result.accessibility.readabilityStatus === "safe" ? "Safe" : "Watch"}
                 </span>
                 <span className="status-chip status-chip-pass">{result.imageAdaptation.hasImage ? "Image attached" : "Theme only"}</span>
+                <span className="status-chip status-chip-pass">{source === "live" ? "Live run" : "Demo preview"}</span>
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
@@ -166,6 +239,28 @@ export function ResultView() {
           </div>
         </div>
       </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        {heroInsight.map((item) => (
+          <article className="glass-panel rounded-[30px] p-5 md:p-6" key={item.title}>
+            <p className="field-label">{item.eyebrow}</p>
+            <h2 className="mt-3 text-2xl font-semibold text-stone-900">{item.title}</h2>
+            <p className="mt-3 text-sm leading-7 text-[var(--foreground-soft)]">{item.body}</p>
+          </article>
+        ))}
+      </section>
+
+      <SectionCard className="overflow-hidden" eyebrow="Demo Flow" title="A stronger talk track for presenting this result board">
+        <div className="demo-track-grid" id="demo-talk-track">
+          {talkTrack.map((item) => (
+            <article className="demo-track-card" key={item.step}>
+              <span className="demo-track-step">{item.step}</span>
+              <h3 className="mt-4 text-xl font-semibold text-stone-900">{item.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-[var(--foreground-soft)]">{item.body}</p>
+            </article>
+          ))}
+        </div>
+      </SectionCard>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <SectionCard eyebrow="Moodboard" title="Direction board">
