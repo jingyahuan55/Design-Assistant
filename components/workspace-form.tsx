@@ -13,6 +13,9 @@ type ApiError = {
   error: string;
 };
 
+const examples = ["Singapore hawker culture", "Inclusive community health service", "Night transit information system"];
+const outputs = ["Direction board", "Color tokens", "Image overlay guidance", "Accessibility signals"];
+
 function readApiError(payload: unknown, fallback: string) {
   if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") {
     return payload.error;
@@ -100,83 +103,102 @@ export function WorkspaceForm() {
   }
 
   return (
-    <form className="glass-panel rounded-[32px] p-6 md:p-8" onSubmit={handleSubmit}>
-      <div className="grid gap-5 md:grid-cols-2">
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-stone-700">Task title</span>
-          <input
-            className="w-full rounded-2xl border border-stone-300/70 bg-white/80 px-4 py-3 outline-none transition focus:border-stone-500"
-            onChange={(event) => setTitle(event.target.value)}
-            value={title}
+    <form className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]" onSubmit={handleSubmit}>
+      <section className="glass-panel rounded-[34px] p-6 md:p-8">
+        <div className="grid gap-5 md:grid-cols-2">
+          <label className="space-y-2">
+            <span className="field-label">Task title</span>
+            <input className="field-input" onChange={(event) => setTitle(event.target.value)} value={title} />
+          </label>
+
+          <label className="space-y-2">
+            <span className="field-label">Style keywords</span>
+            <input className="field-input" onChange={(event) => setStyleKeywords(event.target.value)} value={styleKeywords} />
+          </label>
+        </div>
+
+        <label className="mt-5 block space-y-2">
+          <span className="field-label">Theme</span>
+          <textarea
+            className="field-input field-textarea"
+            onChange={(event) => setThemeText(event.target.value)}
+            value={themeText}
           />
         </label>
 
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-stone-700">Style keywords</span>
-          <input
-            className="w-full rounded-2xl border border-stone-300/70 bg-white/80 px-4 py-3 outline-none transition focus:border-stone-500"
-            onChange={(event) => setStyleKeywords(event.target.value)}
-            value={styleKeywords}
+        <label className="mt-5 block space-y-2">
+          <span className="field-label">Project context</span>
+          <textarea
+            className="field-input min-h-28"
+            onChange={(event) => setDescriptionText(event.target.value)}
+            value={descriptionText}
           />
         </label>
+
+        <div className="mt-5 grid gap-5 md:grid-cols-[1fr_260px]">
+          <label className="space-y-2">
+            <span className="field-label">Tone keywords</span>
+            <input className="field-input" onChange={(event) => setToneKeywords(event.target.value)} value={toneKeywords} />
+          </label>
+
+          <label className="space-y-2">
+            <span className="field-label">Reference image</span>
+            <input
+              accept="image/*"
+              className="field-input block cursor-pointer border-dashed py-[0.88rem] text-sm"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              type="file"
+            />
+            <p className="text-xs text-[var(--muted)]">{file ? `Attached: ${file.name}` : "Optional, but useful for overlay and readability guidance."}</p>
+          </label>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[26px] border border-[var(--line)] bg-white/65 px-4 py-4">
+          <p className="max-w-xl text-sm leading-6 text-[var(--foreground-soft)]">
+            This run keeps the Step 4 contract intact and adds stronger rule feedback so the result board feels closer to a
+            real design review surface.
+          </p>
+          <button className="cta-primary border-0 disabled:cursor-not-allowed disabled:opacity-60" disabled={submitState.isSubmitting || !themeText.trim()} type="submit">
+            {submitState.isSubmitting ? "Running analysis..." : "Generate design language"}
+          </button>
+        </div>
+
+        {submitState.error ? (
+          <p className="mt-4 rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{submitState.error}</p>
+        ) : null}
+      </section>
+
+      <div className="space-y-5">
+        <section className="glass-panel rounded-[32px] p-6">
+          <p className="field-label">Prompt seeds</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {examples.map((example) => (
+              <button
+                className="board-chip border-0 text-left"
+                key={example}
+                onClick={() => setThemeText(example)}
+                type="button"
+              >
+                {example}
+              </button>
+            ))}
+          </div>
+          <p className="mt-4 text-sm leading-7 text-[var(--foreground-soft)]">
+            Use the examples to stress-test whether the system can shift between food, care, and transit style directions.
+          </p>
+        </section>
+
+        <section className="glass-panel rounded-[32px] p-6">
+          <p className="field-label">What comes back</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {outputs.map((item) => (
+              <div className="metric-pill" key={item}>
+                <span className="metric-value text-base">{item}</span>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
-
-      <label className="mt-5 block space-y-2">
-        <span className="text-sm font-medium text-stone-700">Theme description</span>
-        <textarea
-          className="min-h-32 w-full rounded-[24px] border border-stone-300/70 bg-white/80 px-4 py-3 outline-none transition focus:border-stone-500"
-          onChange={(event) => setThemeText(event.target.value)}
-          value={themeText}
-        />
-      </label>
-
-      <label className="mt-5 block space-y-2">
-        <span className="text-sm font-medium text-stone-700">Project context</span>
-        <textarea
-          className="min-h-28 w-full rounded-[24px] border border-stone-300/70 bg-white/80 px-4 py-3 outline-none transition focus:border-stone-500"
-          onChange={(event) => setDescriptionText(event.target.value)}
-          value={descriptionText}
-        />
-      </label>
-
-      <div className="mt-5 grid gap-5 md:grid-cols-[1fr_260px]">
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-stone-700">Tone keywords</span>
-          <input
-            className="w-full rounded-2xl border border-stone-300/70 bg-white/80 px-4 py-3 outline-none transition focus:border-stone-500"
-            onChange={(event) => setToneKeywords(event.target.value)}
-            value={toneKeywords}
-          />
-        </label>
-
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-stone-700">Single reference image</span>
-          <input
-            accept="image/*"
-            className="block w-full rounded-2xl border border-dashed border-stone-400/70 bg-white/80 px-4 py-[0.85rem] text-sm"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            type="file"
-          />
-          <p className="text-xs text-stone-500">{file ? `Attached: ${file.name}` : "Optional, but useful for image adaptation guidance."}</p>
-        </label>
-      </div>
-
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-        <p className="text-sm text-stone-600">
-          Step 4 quality pass: keep the same schema, add stronger rule signals, and make the result page resilient on refresh.
-        </p>
-        <button
-          className="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={submitState.isSubmitting || !themeText.trim()}
-          type="submit"
-        >
-          {submitState.isSubmitting ? "Running rule checks..." : "Generate design language"}
-        </button>
-      </div>
-
-      {submitState.error ? (
-        <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{submitState.error}</p>
-      ) : null}
     </form>
   );
 }

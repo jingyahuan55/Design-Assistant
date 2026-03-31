@@ -7,12 +7,8 @@ import { SectionCard } from "./section-card";
 
 type ViewStatus = "loading" | "ready" | "error";
 
-function statusChipTone(status: "pass" | "watch" | "safe") {
-  if (status === "pass" || status === "safe") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  }
-
-  return "border-amber-200 bg-amber-50 text-amber-800";
+function statusChipClass(status: "pass" | "watch" | "safe") {
+  return status === "pass" || status === "safe" ? "status-chip status-chip-pass" : "status-chip status-chip-watch";
 }
 
 export function ResultView() {
@@ -58,7 +54,11 @@ export function ResultView() {
         const payload = (await response.json()) as TaskDetailResponse | { error?: string };
 
         if (!response.ok || !("result" in payload)) {
-          throw new Error((payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") ? payload.error : "Unable to load this analysis result.");
+          throw new Error(
+            payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+              ? payload.error
+              : "Unable to load this analysis result."
+          );
         }
 
         sessionStorage.setItem(`mvp-task:${taskId}`, JSON.stringify(payload.result));
@@ -93,97 +93,95 @@ export function ResultView() {
 
   if (status === "loading") {
     return (
-      <div className="glass-panel rounded-[32px] p-8">
-        <p className="text-sm text-stone-600">Loading the structured analysis...</p>
+      <div className="glass-panel rounded-[34px] p-8">
+        <p className="text-sm text-[var(--foreground-soft)]">Loading the structured analysis board...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 md:space-y-8">
       {errorMessage ? (
         <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
           {errorMessage} Showing the fallback preview result instead.
         </div>
       ) : null}
 
-      <section className="glass-panel rounded-[32px] p-6 md:p-8">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-stone-500">Top Summary</p>
-        <h1 className="max-w-3xl text-3xl font-semibold text-stone-900 md:text-5xl">{result.summary.title}</h1>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-stone-700">{result.summary.themeSummary}</p>
-        <p className="mt-4 max-w-3xl rounded-2xl bg-white/70 px-4 py-3 text-sm text-stone-700">
-          {result.summary.visualStrategy}
-        </p>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {result.summary.keywords.map((keyword) => (
-            <span
-              className="rounded-full border border-stone-300/80 bg-white/80 px-3 py-1 text-xs font-medium text-stone-700"
-              key={keyword}
-            >
-              {keyword}
-            </span>
-          ))}
+      <section className="glass-panel overflow-hidden rounded-[40px] px-6 py-7 md:px-8 md:py-8">
+        <div className="hero-orb h-44 w-44 bg-[rgba(31,109,99,0.12)] right-[6%] top-[6%]" />
+        <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+          <div>
+            <span className="eyebrow-chip">Result Board</span>
+            <h1 className="display-title mt-5 max-w-4xl text-4xl leading-[0.95] text-stone-900 md:text-6xl">
+              {result.summary.title}
+            </h1>
+            <p className="mt-5 max-w-3xl text-lg leading-8 text-[var(--foreground-soft)]">{result.summary.themeSummary}</p>
+            <div className="mt-6 rounded-[28px] border border-[var(--line)] bg-white/70 px-5 py-4 text-sm leading-7 text-[var(--foreground-soft)]">
+              {result.summary.visualStrategy}
+            </div>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {result.summary.keywords.map((keyword) => (
+                <span className="board-chip" key={keyword}>
+                  {keyword}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="board-grid">
+            <article className="board-card">
+              <p className="field-label">System Snapshot</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className={statusChipClass(result.accessibility.contrastStatus)}>
+                  Contrast {result.accessibility.contrastStatus === "pass" ? "Pass" : "Watch"}
+                </span>
+                <span className={statusChipClass(result.accessibility.readabilityStatus)}>
+                  Image {result.accessibility.readabilityStatus === "safe" ? "Safe" : "Watch"}
+                </span>
+                <span className="status-chip status-chip-pass">{result.imageAdaptation.hasImage ? "Image attached" : "Theme only"}</span>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                {result.colorSystem.slice(0, 4).map((token) => (
+                  <div className="preview-swatch" key={token.tokenName} style={{ backgroundColor: token.hex }} title={token.hex} />
+                ))}
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                <div className="metric-pill">
+                  <span className="metric-label">Contrast ratio</span>
+                  <span className="metric-value">{result.accessibility.contrastRatio}:1</span>
+                </div>
+                <div className="metric-pill">
+                  <span className="metric-label">Overlay range</span>
+                  <span className="metric-value text-base">{result.imageAdaptation.overlayOpacity}</span>
+                </div>
+              </div>
+            </article>
+
+            <article className="panel-soft rounded-[28px] p-5">
+              <p className="field-label">Mood prompt</p>
+              <p className="mt-3 text-sm leading-7 text-[var(--foreground-soft)]">{result.moodboard.moodPrompt}</p>
+            </article>
+          </div>
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <SectionCard eyebrow="Moodboard" title="Direction board">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             {result.moodboard.styleTags.map((tag) => (
-              <div className="rounded-3xl border border-stone-300/70 bg-white/70 p-4" key={tag}>
+              <div className="rounded-[22px] border border-[var(--line)] bg-white/72 px-4 py-3" key={tag}>
                 <p className="text-sm font-medium text-stone-800">{tag}</p>
               </div>
             ))}
           </div>
-          <p>{result.moodboard.iconDirection}</p>
-          <p>{result.moodboard.textureDirection}</p>
-          <p>{result.moodboard.moodPrompt}</p>
-        </SectionCard>
-
-        <SectionCard eyebrow="Accessibility" title="Minimum quality guardrails">
-          <div className="flex flex-wrap gap-2">
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusChipTone(result.accessibility.contrastStatus)}`}>
-              Contrast {result.accessibility.contrastStatus === "pass" ? "Pass" : "Watch"}
-            </span>
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusChipTone(result.accessibility.readabilityStatus)}`}>
-              Image readability {result.accessibility.readabilityStatus === "safe" ? "Safe" : "Watch"}
-            </span>
-          </div>
           <p>
-            <strong>Contrast:</strong> {result.accessibility.contrastAlert}
+            <strong>Icon direction:</strong> {result.moodboard.iconDirection}
           </p>
           <p>
-            <strong>Readable imagery:</strong> {result.accessibility.readabilityAlert}
+            <strong>Texture direction:</strong> {result.moodboard.textureDirection}
           </p>
-          <p>
-            <strong>State guidance:</strong> {result.accessibility.stateGuidance}
-          </p>
-          <p>
-            <strong>Measured ratio:</strong> {result.accessibility.contrastRatio}:1
-          </p>
-        </SectionCard>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <SectionCard eyebrow="Color System" title="Core tokens">
-          <div className="grid gap-3">
-            {result.colorSystem.map((token) => (
-              <div className="rounded-[24px] border border-stone-300/80 bg-white/70 p-4" key={token.tokenName}>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-stone-900">{token.label}</p>
-                    <p className="text-xs uppercase tracking-[0.22em] text-stone-500">{token.tokenName}</p>
-                  </div>
-                  <div
-                    aria-label={token.hex}
-                    className="h-12 w-12 rounded-2xl border border-black/10"
-                    style={{ backgroundColor: token.hex }}
-                  />
-                </div>
-                <p className="mt-3 text-sm text-stone-700">{token.usage}</p>
-              </div>
-            ))}
-          </div>
         </SectionCard>
 
         <SectionCard eyebrow="Image Adaptation" title="How the image should behave">
@@ -194,7 +192,7 @@ export function ResultView() {
                 {result.imageAdaptation.palette.map((swatch) => (
                   <span
                     aria-label={swatch}
-                    className="h-10 w-10 rounded-2xl border border-black/10"
+                    className="preview-swatch"
                     key={swatch}
                     style={{ backgroundColor: swatch }}
                     title={swatch}
@@ -215,12 +213,16 @@ export function ResultView() {
               </p>
             </>
           ) : (
-            <div className="rounded-[24px] border border-dashed border-stone-300 bg-stone-50/70 p-4 text-sm text-stone-600">
+            <div className="rounded-[24px] border border-dashed border-[var(--line-strong)] bg-white/60 px-4 py-4 text-sm text-[var(--foreground-soft)]">
               No reference image was uploaded. This section is showing safe defaults based on theme-only analysis.
             </div>
           )}
-          <p>{result.imageAdaptation.borderRecommendation}</p>
-          <p>{result.imageAdaptation.placementRecommendation}</p>
+          <p>
+            <strong>Border treatment:</strong> {result.imageAdaptation.borderRecommendation}
+          </p>
+          <p>
+            <strong>Best placement:</strong> {result.imageAdaptation.placementRecommendation}
+          </p>
           <p>
             <strong>Safe text region:</strong> {result.imageAdaptation.safeTextRegion}
           </p>
@@ -230,29 +232,48 @@ export function ResultView() {
         </SectionCard>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <SectionCard eyebrow="Export Snippets" title="CSS variables">
-          <pre className="overflow-x-auto rounded-[24px] bg-stone-950 p-4 text-xs leading-6 text-stone-100">
-            {result.exportSnippets.cssVariables}
-          </pre>
-          <button
-            className="rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-stone-700"
-            onClick={() => handleCopy("css", result.exportSnippets.cssVariables)}
-            type="button"
-          >
+      <div className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
+        <SectionCard eyebrow="Accessibility" title="Minimum quality guardrails">
+          <p>
+            <strong>Contrast:</strong> {result.accessibility.contrastAlert}
+          </p>
+          <p>
+            <strong>Readable imagery:</strong> {result.accessibility.readabilityAlert}
+          </p>
+          <p>
+            <strong>State guidance:</strong> {result.accessibility.stateGuidance}
+          </p>
+        </SectionCard>
+
+        <SectionCard eyebrow="Color System" title="Core tokens">
+          <div className="grid gap-3 md:grid-cols-2">
+            {result.colorSystem.map((token) => (
+              <div className="rounded-[24px] border border-[var(--line)] bg-white/72 p-4" key={token.tokenName}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-lg font-semibold text-stone-900">{token.label}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.22em] text-[var(--muted)]">{token.tokenName}</p>
+                  </div>
+                  <div className="preview-swatch" style={{ backgroundColor: token.hex }} title={token.hex} />
+                </div>
+                <p className="mt-4 text-sm leading-7 text-[var(--foreground-soft)]">{token.usage}</p>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <SectionCard eyebrow="Export" title="CSS variables">
+          <pre className="code-panel text-xs leading-6">{result.exportSnippets.cssVariables}</pre>
+          <button className="cta-secondary px-4 py-2 text-sm" onClick={() => handleCopy("css", result.exportSnippets.cssVariables)} type="button">
             {copied === "css" ? "Copied" : "Copy CSS variables"}
           </button>
         </SectionCard>
 
-        <SectionCard eyebrow="Export Snippets" title="Tailwind theme">
-          <pre className="overflow-x-auto rounded-[24px] bg-stone-950 p-4 text-xs leading-6 text-stone-100">
-            {result.exportSnippets.tailwindSnippet}
-          </pre>
-          <button
-            className="rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-stone-700"
-            onClick={() => handleCopy("tailwind", result.exportSnippets.tailwindSnippet)}
-            type="button"
-          >
+        <SectionCard eyebrow="Export" title="Tailwind theme snippet">
+          <pre className="code-panel text-xs leading-6">{result.exportSnippets.tailwindSnippet}</pre>
+          <button className="cta-secondary px-4 py-2 text-sm" onClick={() => handleCopy("tailwind", result.exportSnippets.tailwindSnippet)} type="button">
             {copied === "tailwind" ? "Copied" : "Copy Tailwind snippet"}
           </button>
         </SectionCard>
