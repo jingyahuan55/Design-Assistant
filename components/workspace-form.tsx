@@ -13,7 +13,42 @@ type ApiError = {
   error: string;
 };
 
-const examples = ["Singapore hawker culture", "Inclusive community health service", "Night transit information system"];
+type DemoPreset = {
+  name: string;
+  title: string;
+  themeText: string;
+  descriptionText: string;
+  styleKeywords: string;
+  toneKeywords: string;
+};
+
+const presets: DemoPreset[] = [
+  {
+    name: "Singapore Hawker",
+    title: "Singapore Hawker App",
+    themeText: "Singapore hawker culture",
+    descriptionText: "A polished demo for a community-first food discovery experience with warmth, modular cards, and city texture.",
+    styleKeywords: "warm, urban, friendly",
+    toneKeywords: "inclusive, vibrant"
+  },
+  {
+    name: "Inclusive Care",
+    title: "Community Health Service",
+    themeText: "Inclusive community health service",
+    descriptionText: "A calm service experience for booking, guidance, and support, with emphasis on trust, accessibility, and reassurance.",
+    styleKeywords: "calm, trustworthy, clear",
+    toneKeywords: "accessible, supportive"
+  },
+  {
+    name: "Night Transit",
+    title: "Night Transit Information Screen",
+    themeText: "Urban night transit information system",
+    descriptionText: "A high-contrast wayfinding surface that helps commuters read timing, route changes, and alerts at a glance.",
+    styleKeywords: "high-contrast, urban, compact",
+    toneKeywords: "alert, legible"
+  }
+];
+
 const outputs = ["Direction board", "Color tokens", "Image overlay guidance", "Accessibility signals"];
 
 function readApiError(payload: unknown, fallback: string) {
@@ -26,16 +61,26 @@ function readApiError(payload: unknown, fallback: string) {
 
 export function WorkspaceForm() {
   const router = useRouter();
-  const [title, setTitle] = useState("Singapore Hawker App");
-  const [themeText, setThemeText] = useState("Singapore hawker culture");
-  const [descriptionText, setDescriptionText] = useState("A polished demo for a community-first food discovery experience.");
-  const [styleKeywords, setStyleKeywords] = useState("warm, urban, friendly");
-  const [toneKeywords, setToneKeywords] = useState("inclusive, vibrant");
+  const [title, setTitle] = useState(presets[0].title);
+  const [themeText, setThemeText] = useState(presets[0].themeText);
+  const [descriptionText, setDescriptionText] = useState(presets[0].descriptionText);
+  const [styleKeywords, setStyleKeywords] = useState(presets[0].styleKeywords);
+  const [toneKeywords, setToneKeywords] = useState(presets[0].toneKeywords);
   const [file, setFile] = useState<File | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState(presets[0].name);
   const [submitState, setSubmitState] = useState<SubmitState>({
     error: null,
     isSubmitting: false
   });
+
+  function applyPreset(preset: DemoPreset) {
+    setSelectedPreset(preset.name);
+    setTitle(preset.title);
+    setThemeText(preset.themeText);
+    setDescriptionText(preset.descriptionText);
+    setStyleKeywords(preset.styleKeywords);
+    setToneKeywords(preset.toneKeywords);
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -170,22 +215,36 @@ export function WorkspaceForm() {
 
       <div className="space-y-5">
         <section className="glass-panel rounded-[32px] p-6">
-          <p className="field-label">Prompt seeds</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {examples.map((example) => (
-              <button
-                className="board-chip border-0 text-left"
-                key={example}
-                onClick={() => setThemeText(example)}
-                type="button"
-              >
-                {example}
-              </button>
-            ))}
+          <div className="flex items-center justify-between gap-3">
+            <p className="field-label">Demo presets</p>
+            <span className="text-xs text-[var(--muted)]">Selected: {selectedPreset}</span>
           </div>
-          <p className="mt-4 text-sm leading-7 text-[var(--foreground-soft)]">
-            Use the examples to stress-test whether the system can shift between food, care, and transit style directions.
-          </p>
+
+          <div className="mt-4 space-y-3">
+            {presets.map((preset) => {
+              const isSelected = selectedPreset === preset.name;
+              return (
+                <button
+                  className={`w-full rounded-[24px] border px-4 py-4 text-left transition ${
+                    isSelected
+                      ? "border-[rgba(200,106,47,0.35)] bg-[rgba(242,207,182,0.42)]"
+                      : "border-[var(--line)] bg-white/70 hover:bg-white/88"
+                  }`}
+                  key={preset.name}
+                  onClick={() => applyPreset(preset)}
+                  type="button"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-stone-900">{preset.name}</p>
+                      <p className="mt-2 text-sm leading-6 text-[var(--foreground-soft)]">{preset.descriptionText}</p>
+                    </div>
+                    <span className="board-chip border-0">Use</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className="glass-panel rounded-[32px] p-6">
